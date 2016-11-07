@@ -161,6 +161,15 @@ static void test_parse_string(){
 	TEST_STRING("\xF0\x9D\x84\x9E", "\"\\ud834\\udd1e\""); /* G celf sign U+1D11E */
 }
 
+static void test_parse_object(){
+	lept_value v;
+	size_t i;
+	lept_init(&v);
+	EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, " { } "));
+	EXPECT_EQ_INT(LEPT_OBJECT, lept_get_type(&v));
+	EXPECT_EQ_SIZE_T(0, lept_get_object_size(&v));
+	lept_free(&v);
+}
 
 #define TEST_ERROR(error, json)\
 	do{\
@@ -267,6 +276,7 @@ static void test_parse() {
 	test_parse_number();
 	test_parse_string();
 	test_parse_array();
+	test_parse_object();
 
     test_parse_expect_value();
     test_parse_invalid_value();
