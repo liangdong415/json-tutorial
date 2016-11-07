@@ -270,14 +270,19 @@ static int lept_parse_object(lept_context* c, lept_value* v){
 			ret = LEPT_PARSE_MISS_KEY;
 			break;
 		}
-		if((ret = lept_parse_string_raw(c, &m.k, &m.klen)) != LEPT_PARSE_OK){
+		char* key;
+		if((ret = lept_parse_string_raw(c, &key, &m.klen)) != LEPT_PARSE_OK){
 			break;
 		}
+		memcpy(m.k = (char*)malloc(m.klen + 1), key, m.klen);
+		m.k[m.klen] = '\0';
 		lept_parse_whitespace(c);
 		if(*c->json != ':'){
 			ret = LEPT_PARSE_MISS_COLON;
+			free(m.k);
 			break;
 		}
+		++c->json;
 		lept_parse_whitespace(c);
 		if((ret = lept_parse_value(c, &m.v) != LEPT_PARSE_OK))
 			break;
@@ -297,10 +302,17 @@ static int lept_parse_object(lept_context* c, lept_value* v){
 			memcpy(v->u.o.m = (lept_member*)malloc(size), lept_context_pop(c, size), size);
 			return LEPT_PARSE_OK;
 		}
+		else{
+			ret = LEPT_PARSE_MISS_COMMA_OR_CURLY_BRACKET;
+			break;
+		}
 	}
 	size_t i;
-	for(i = 0; i < size; ++i)
-		lept_free((lept_value*)lept_context_pop(c, sizeof(lept_member)));
+	for(i = 0; i < size; ++i){
+		lept_member* m = (lept_member*)lept_context_pop(c, sizeof(lept_member));
+		free(m->k);
+		lept_free(&m->v);
+	}
 	return ret;
 }
 
@@ -353,6 +365,14 @@ void lept_free(lept_value* v){
 			lept_free(lept_get_array_element(v, i));
 		free(v->u.a.e);
 	}
+	else if(v->type == LEPT_OBJECT){
+		size_t i;
+		for(i = 0; i < lept_get_object_size(v); ++i){
+			free(lept_get_object_key(v, i));
+			lept_free(lept_get_object_value(v, i));
+		}
+		free(v->u.o.m);
+	}
 	v->type = LEPT_NULL;
 }
 
@@ -403,7 +423,7 @@ size_t lept_get_object_size(const lept_value* v){
 	return v->u.o.size;
 }
 
-const char* lept_get_object_key(const lept_value* v, size_t index){
+char* lept_get_object_key(const lept_value* v, size_t index){
 	assert(v != NULL && v->type == LEPT_OBJECT);
 	assert(index < v->u.o.size);
 	return (v->u.o.m[index].k);
